@@ -1,12 +1,14 @@
 package com.example.paging3app.vm
 
 import androidx.lifecycle.ViewModel
-import com.example.paging3app.data.ApiService
-import com.example.paging3app.data.RetrofitClient
+import androidx.lifecycle.viewModelScope
+import androidx.paging.cachedIn
+import com.example.paging3app.data.data_sources.PassengersDataSource
+import com.example.paging3app.data.data_sources.PassengersDataSourceImpl
 
 class MainVm : ViewModel() {
-    private val apiService : ApiService by lazy {
-        RetrofitClient.retrofit.create(ApiService::class.java)
+    private val passengersDataSource : PassengersDataSource by lazy {
+        PassengersDataSourceImpl()
     }
-    suspend fun getPassengers(page : Int) = apiService.getPassengers(page = page).body()?.passengers
+    suspend fun getPassengers() = passengersDataSource.getPassengers().cachedIn(viewModelScope)
 }
