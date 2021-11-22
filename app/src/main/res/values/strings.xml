@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">Paging3App</string>
+    <string name="item_could_not_be_loaded">Item could not be loaded</string>
+    <string name="retry">Retry</string>
 </resources>

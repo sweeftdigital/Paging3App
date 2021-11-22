@@ -3,9 +3,11 @@ package com.example.paging3app.ui
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import androidx.lifecycle.*
+import androidx.recyclerview.widget.ConcatAdapter
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.paging3app.R
+import com.example.paging3app.ui.adapters.PassengerLoadStateAdapter
 import com.example.paging3app.ui.adapters.PassengersAdapter
 import com.example.paging3app.vm.MainVm
 import kotlinx.coroutines.CoroutineScope
@@ -41,7 +43,10 @@ class MainActivity : AppCompatActivity() {
 
     private fun initPassengersAdapter() {
         passengersAdapter = PassengersAdapter()
-        passengerRecyclerView.adapter = passengersAdapter
+        passengerRecyclerView.adapter = passengersAdapter.withLoadStateHeaderAndFooter(
+            header = PassengerLoadStateAdapter { passengersAdapter.retry() },
+            footer = PassengerLoadStateAdapter { passengersAdapter.retry() }
+        )
         passengerRecyclerView.layoutManager = linearLayoutManager
     }
 
