@@ -3,10 +3,10 @@ package com.example.paging3app.ui
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import androidx.lifecycle.*
-import androidx.recyclerview.widget.ConcatAdapter
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.paging3app.R
+import com.example.paging3app.data.room_db.PassengersDatabase
 import com.example.paging3app.ui.adapters.PassengerLoadStateAdapter
 import com.example.paging3app.ui.adapters.PassengersAdapter
 import com.example.paging3app.vm.MainVm
@@ -29,11 +29,6 @@ class MainActivity : AppCompatActivity() {
         init()
         initPassengersAdapter()
 
-        CoroutineScope(Dispatchers.IO).launch {
-            mainVm.getPassengers().collectLatest {
-                passengersAdapter.submitData(it)
-            }
-        }
     }
 
     private fun init() {

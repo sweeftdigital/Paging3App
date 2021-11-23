@@ -13,14 +13,5 @@ data class PassengersResponse(
 data class Passenger(
     @SerializedName("_id")
     val id : String,
-    val name : String,
-    val trips : Double,
-    val airline : List<Airline>
-
-)
-
-data class Airline(
-    val id : Long,
-    val name : String,
-    val logo : String
+    val name : String
 )
