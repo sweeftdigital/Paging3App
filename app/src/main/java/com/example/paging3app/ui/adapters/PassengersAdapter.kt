@@ -1,5 +1,6 @@
 package com.example.paging3app.ui.adapters
 
+import android.util.Log.d
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup

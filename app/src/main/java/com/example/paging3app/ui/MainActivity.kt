@@ -2,7 +2,9 @@ package com.example.paging3app.ui
 
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
+import android.util.Log.d
 import androidx.lifecycle.*
+import androidx.paging.ExperimentalPagingApi
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.paging3app.R
@@ -15,6 +17,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
+@ExperimentalPagingApi
 class MainActivity : AppCompatActivity() {
     private val mainVm: MainVm by lazy {
         ViewModelProvider(this).get(MainVm::class.java)
@@ -23,12 +26,13 @@ class MainActivity : AppCompatActivity() {
     private lateinit var passengerRecyclerView: RecyclerView
     private lateinit var passengersAdapter: PassengersAdapter
     private lateinit var linearLayoutManager: LinearLayoutManager
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         init()
         initPassengersAdapter()
-
+        updatePassengersAdapter()
     }
 
     private fun init() {
@@ -36,13 +40,17 @@ class MainActivity : AppCompatActivity() {
         linearLayoutManager = LinearLayoutManager(this)
     }
 
-    private fun initPassengersAdapter() {
-        passengersAdapter = PassengersAdapter()
-        passengerRecyclerView.adapter = passengersAdapter.withLoadStateHeaderAndFooter(
-            header = PassengerLoadStateAdapter { passengersAdapter.retry() },
-            footer = PassengerLoadStateAdapter { passengersAdapter.retry() }
-        )
-        passengerRecyclerView.layoutManager = linearLayoutManager
+    private fun updatePassengersAdapter() {
+        CoroutineScope(Dispatchers.Main).launch {
+            mainVm.getPassengersFromDb().collectLatest {
+                passengersAdapter.submitData(it)
+            }
+        }
     }
 
+    private fun initPassengersAdapter() {
+        passengersAdapter = PassengersAdapter()
+        passengerRecyclerView.adapter = passengersAdapter
+        passengerRecyclerView.layoutManager = linearLayoutManager
+    }
 }

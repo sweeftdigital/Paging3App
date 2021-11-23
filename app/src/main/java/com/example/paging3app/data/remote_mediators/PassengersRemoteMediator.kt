@@ -7,6 +7,7 @@ import androidx.paging.RemoteMediator
 import com.example.paging3app.App
 import com.example.paging3app.data.ApiService
 import com.example.paging3app.data.RetrofitClient
+import com.example.paging3app.data.models.Passenger
 import com.example.paging3app.data.room_db.PassengersDatabase
 import com.example.paging3app.data.room_db.entities.PassengerEntity
 import com.example.paging3app.data.room_db.entities.RemoteKeysEntity
@@ -64,7 +65,8 @@ class PassengersRemoteMediator : RemoteMediator<Int, PassengerEntity>() {
                     }
 
                     passengersDatabase.getRemoteKeysDao().insertAll(remoteKeys)
-                    passengersDatabase.getPassengersDao().insertAllPassengers(it.passengers)
+                    passengersDatabase.getPassengersDao()
+                        .insertAllPassengers(mapToPassengersEntity(it.passengers))
 
                     return MediatorResult.Success(endOfPaginationReached = true)
 
@@ -91,6 +93,11 @@ class PassengersRemoteMediator : RemoteMediator<Int, PassengerEntity>() {
             passengersDatabase.getRemoteKeysDao().remoteKeysPassenger(it.id)
         }
     }
+
+    private fun mapToPassengersEntity(passengers: List<Passenger>): List<PassengerEntity> =
+        passengers.map {
+            PassengerEntity(it.id, it.name)
+        }
 
     companion object {
         const val INIT_PAGE = 0

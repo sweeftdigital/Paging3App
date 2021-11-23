@@ -11,7 +11,7 @@ import com.example.paging3app.data.room_db.entities.PassengerEntity
 @Dao
 interface PassengersDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertAllPassengers(passengers : List<Passenger>)
+    suspend fun insertAllPassengers(passengers : List<PassengerEntity>)
 
     @Query("DELETE FROM passengerentity")
     suspend fun deleteAllPassengers()
