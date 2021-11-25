@@ -1,6 +1,7 @@
 package com.example.paging3app.vm
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import androidx.paging.*
 import com.example.paging3app.App
 import com.example.paging3app.data.remote_mediators.PassengersRemoteMediator
@@ -15,20 +16,19 @@ class MainVm : ViewModel() {
     }
 
     @ExperimentalPagingApi
-    fun getPassengersFromDb() : Flow<PagingData<PassengerEntity>> {
-        return  Pager(
-            PagingConfig(
-                pageSize = PAGE_SIZE,
-                maxSize = 1000
+    fun getPassengersFromDb(): Flow<PagingData<PassengerEntity>> {
+        val pagingSourceFactory = { passengerDao.getAllPassengers() }
+        val pager : Pager<Int, PassengerEntity> =  Pager(
+            config = PagingConfig(
+                pageSize = PAGE_SIZE
             ),
+            pagingSourceFactory = pagingSourceFactory,
             remoteMediator = PassengersRemoteMediator()
-        ) {
-            passengerDao.getAllPassengers()
-        }.flow
+        )
+        return pager.flow
     }
 
-   companion object {
-       private const val PAGE_SIZE = 100
-   }
-
+    companion object {
+        private const val PAGE_SIZE = 300
+    }
 }

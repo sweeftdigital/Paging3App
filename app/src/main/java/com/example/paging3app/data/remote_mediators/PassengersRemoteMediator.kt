@@ -4,6 +4,7 @@ import androidx.paging.ExperimentalPagingApi
 import androidx.paging.LoadType
 import androidx.paging.PagingState
 import androidx.paging.RemoteMediator
+import androidx.room.withTransaction
 import com.example.paging3app.App
 import com.example.paging3app.data.ApiService
 import com.example.paging3app.data.RetrofitClient
@@ -11,8 +12,9 @@ import com.example.paging3app.data.models.Passenger
 import com.example.paging3app.data.room_db.PassengersDatabase
 import com.example.paging3app.data.room_db.entities.PassengerEntity
 import com.example.paging3app.data.room_db.entities.RemoteKeysEntity
+import retrofit2.HttpException
+import java.io.IOException
 import java.io.InvalidObjectException
-import java.lang.Exception
 
 @ExperimentalPagingApi
 class PassengersRemoteMediator : RemoteMediator<Int, PassengerEntity>() {
@@ -26,71 +28,93 @@ class PassengersRemoteMediator : RemoteMediator<Int, PassengerEntity>() {
     }
 
     override suspend fun load(
-        loadType: LoadType,
-        state: PagingState<Int, PassengerEntity>
+        loadType: LoadType, state: PagingState<Int, PassengerEntity>
     ): MediatorResult {
-        return try {
-            val page = when (loadType) {
-                LoadType.APPEND -> {
-                    val remoteKey =
-                        getLastKey(state) ?: throw InvalidObjectException("InvalidObjectException")
-                    remoteKey.nextKey
-                        ?: return MediatorResult.Success(endOfPaginationReached = true)
 
-                }
-                LoadType.PREPEND -> {
-                    return MediatorResult.Success(endOfPaginationReached = true)
-                }
-                LoadType.REFRESH -> {
-                    val remoteKey = getClosestKey(state)
-                    remoteKey?.nextKey?.minus(1) ?: INIT_PAGE
-                }
+        val pageKeyData = getKeyPageData(loadType, state)
+        val page = when (pageKeyData) {
+            is MediatorResult.Success -> {
+                return pageKeyData
             }
-
-            val response = apiService.getPassengers(page, state.config.initialLoadSize)
-            val endOfPagination = response.body()?.passengers!!.size < state.config.pageSize
-
-            if (response.isSuccessful) {
-                response.body()!!.let { it ->
-                    if (loadType == LoadType.REFRESH) {
-                        passengersDatabase.getRemoteKeysDao().clearRemoteKeys()
-                        passengersDatabase.getPassengersDao().deleteAllPassengers()
-                    }
-
-                    val prevKey = if (page == INIT_PAGE) null else page - 1
-                    val nextKey = if (endOfPagination) null else page + 1
-
-                    val remoteKeys = it.passengers.map {
-                        RemoteKeysEntity(it.id, prevKey, nextKey)
-                    }
-
-                    passengersDatabase.getRemoteKeysDao().insertAll(remoteKeys)
-                    passengersDatabase.getPassengersDao()
-                        .insertAllPassengers(mapToPassengersEntity(it.passengers))
-
-                    return MediatorResult.Success(endOfPaginationReached = true)
-
-                }
-            } else {
-                return MediatorResult.Success(endOfPaginationReached = true)
+            else -> {
+                pageKeyData as Int
             }
+        }
 
-        } catch (e: Exception) {
-            MediatorResult.Error(e)
+        try {
+            val response = apiService.getPassengers(page, state.config.pageSize)
+            val passengers = response.body()?.passengers
+            val isEndOfList = passengers?.isEmpty()
+            passengersDatabase.withTransaction {
+                if (loadType == LoadType.REFRESH) {
+                    passengersDatabase.getPassengersDao().deleteAllPassengers()
+                    passengersDatabase.getRemoteKeysDao().clearRemoteKeys()
+                }
+                val prevKey = if (page == INIT_PAGE) null else page - 1
+                val nextKey = if (isEndOfList!!) null else page + 1
+                val keys = passengers.map {
+                    RemoteKeysEntity(repoId = it.id, prevKey = prevKey, nextKey = nextKey)
+                }
+                passengersDatabase.getRemoteKeysDao().insertAll(keys)
+                passengersDatabase.getPassengersDao().insertAllPassengers(mapToPassengersEntity(passengers))
+            }
+            return MediatorResult.Success(endOfPaginationReached = false)
+        } catch (exception: IOException) {
+            return MediatorResult.Error(exception)
+        } catch (exception: HttpException) {
+            return MediatorResult.Error(exception)
         }
     }
 
-    private suspend fun getClosestKey(state: PagingState<Int, PassengerEntity>): RemoteKeysEntity? {
-        return state.anchorPosition?.let {
-            state.closestItemToPosition(it).let {
-                passengersDatabase.getRemoteKeysDao().remoteKeysPassenger(it!!.id)
+
+    /**
+     * this returns the page key or the final end of list success result
+     */
+    suspend fun getKeyPageData(loadType: LoadType, state: PagingState<Int, PassengerEntity>): Any? {
+        return when (loadType) {
+            LoadType.REFRESH -> {
+                val remoteKeys = getClosestRemoteKey(state)
+                remoteKeys?.nextKey?.minus(1) ?: INIT_PAGE
+            }
+            LoadType.APPEND -> {
+                val remoteKeys = getLastRemoteKey(state)
+                    ?: throw InvalidObjectException("Remote key should not be null for $loadType")
+                remoteKeys.nextKey
+            }
+            LoadType.PREPEND -> {
+                val remoteKeys = getFirstRemoteKey(state)
+                    ?: throw InvalidObjectException("Invalid state, key should not be null")
+                remoteKeys.prevKey ?: return MediatorResult.Success(endOfPaginationReached = true)
+                remoteKeys.prevKey
             }
         }
     }
 
-    private suspend fun getLastKey(state: PagingState<Int, PassengerEntity>): RemoteKeysEntity? {
-        return state.lastItemOrNull()?.let {
-            passengersDatabase.getRemoteKeysDao().remoteKeysPassenger(it.id)
+    private suspend fun getLastRemoteKey(state: PagingState<Int, PassengerEntity>): RemoteKeysEntity? {
+        return state.pages
+            .lastOrNull { it.data.isNotEmpty() }
+            ?.data?.lastOrNull()
+            ?.let { passenger -> passengersDatabase.getRemoteKeysDao().remoteKeysPassenger(passenger.id) }
+    }
+
+    /**
+     * get the first remote key inserted which had the data
+     */
+    private suspend fun getFirstRemoteKey(state: PagingState<Int, PassengerEntity>): RemoteKeysEntity? {
+        return state.pages
+            .firstOrNull() { it.data.isNotEmpty() }
+            ?.data?.firstOrNull()
+            ?.let { passenger -> passengersDatabase.getRemoteKeysDao().remoteKeysPassenger(passenger.id) }
+    }
+
+    /**
+     * get the closest remote key inserted which had the data
+     */
+    private suspend fun getClosestRemoteKey(state: PagingState<Int, PassengerEntity>): RemoteKeysEntity? {
+        return state.anchorPosition?.let { position ->
+            state.closestItemToPosition(position)?.id?.let { repoId ->
+                passengersDatabase.getRemoteKeysDao().remoteKeysPassenger(repoId)
+            }
         }
     }
 

@@ -7,5 +7,5 @@ import androidx.room.PrimaryKey
 data class PassengerEntity(
     @PrimaryKey
     val id : String,
-    val name : String,
+    val name : String?,
 )
